@@ -1,6 +1,6 @@
 #include "arklog/arklog.h"
 
 int main(void) {
-  print_hello();
+  ARKLOG_TRACE("Hola");
   return 0;
 }
