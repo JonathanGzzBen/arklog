@@ -87,5 +87,5 @@ foreach(compiler_flag ${custom_compiler_flags})
     endif()
 endforeach()
 
-add_executable(arklog_test tests/tests.c)
+add_executable(arklog_test tests/tests.c tests/ring_buffer_tests.c)
 target_link_libraries(arklog_test PRIVATE arklog_lib)

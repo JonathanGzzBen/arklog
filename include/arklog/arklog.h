@@ -7,6 +7,8 @@
 #define __FILENAME__                                                           \
   (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
+// Producer
+// Will insert messages into the ring buffer
 void alog_log(int level, const char *file, int line, const char *func,
               const char *fmt, ...);
 
