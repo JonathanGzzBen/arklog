@@ -15,8 +15,24 @@ void test_condition(const char *const condition_description, bool condition) {
   }
 }
 
+void start_test_section(const char *const section_name) {
+  printf(ANSI_COLOR_BLUE LINE "%20s" ANSI_COLOR_MAGENTA
+                              "  START " ANSI_COLOR_BLUE LINE
+                              "\n" ANSI_COLOR_RESET,
+         section_name);
+}
+
+void end_test_section(const char *const section_name) {
+  printf(ANSI_COLOR_BLUE LINE "%20s" ANSI_COLOR_MAGENTA
+                              "    END " ANSI_COLOR_BLUE LINE
+                              "\n" ANSI_COLOR_RESET,
+         section_name);
+}
+
 int main(void) {
   ARKLOG_TRACE("Hola");
+  start_test_section("RING BUFFER");
   test_ring_buffer();
+  end_test_section("RING BUFFER");
   return 0;
 }
