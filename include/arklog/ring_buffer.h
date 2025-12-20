@@ -12,19 +12,21 @@ typedef struct AlogRingBuffer {
   void *data;
   size_t head;
   size_t tail;
-  size_t size;
+  size_t capacity;
+  size_t elem_size;
 } AlogRingBuffer;
 
-AlogRingBuffer alog_ring_buffer_create(size_t size);
+AlogRingBuffer alog_ring_buffer_create(size_t elem_count, size_t elem_size);
 bool alog_ring_buffer_push(AlogRingBuffer *ring, void *data);
 bool alog_ring_buffer_pop(AlogRingBuffer *ring, void *dest);
 
-AlogRingBuffer alog_ring_buffer_create(size_t size) {
-  AlogRingBuffer ring;
-  ring.data = (void *)malloc((size + 1) * sizeof(void *));
-  ring.head = 0;
-  ring.tail = 0;
-  ring.size = size + 1; // One extra space for wrapping
+AlogRingBuffer alog_ring_buffer_create(size_t elem_count, size_t elem_size) {
+  AlogRingBuffer ring = {.data = (void *)malloc((elem_count + 1) * elem_size),
+                         .head = 0,
+                         .tail = 0,
+                         .capacity = elem_count + 1, // Extra space for wrapping
+                         .elem_size = elem_size};
+  assert(ring.data != NULL);
   return ring;
 }
 
@@ -32,10 +34,10 @@ bool alog_ring_buffer_push(AlogRingBuffer *ring, void *data) {
   assert(ring != NULL);
   assert(data != NULL);
 
-  const size_t new_tail = (ring->tail + 1) % ring->size;
+  const size_t new_tail = (ring->tail + 1) % ring->capacity;
   assert(new_tail != ring->head); // Full queue
-  void *dest = (char *)ring->data + (ring->tail * sizeof(int));
-  memcpy(dest, data, sizeof(int));
+  void *dest = (char *)ring->data + (ring->tail * ring->elem_size);
+  memcpy(dest, data, ring->elem_size);
 
   ring->tail = new_tail;
   return true;
@@ -45,10 +47,9 @@ bool alog_ring_buffer_pop(AlogRingBuffer *ring, void *dest) {
   assert(ring != NULL);
   assert(ring->head != ring->tail); // Empty queue
 
-  const size_t new_head = (ring->head + 1) % ring->size;
-  // void *data = ring->data[ring->head];
-  void *data = (char *)ring->data + (ring->head * sizeof(int));
-  memcpy(dest, data, sizeof(int));
+  const size_t new_head = (ring->head + 1) % ring->capacity;
+  void *data = (char *)ring->data + (ring->head * ring->elem_size);
+  memcpy(dest, data, ring->elem_size);
   ring->head = new_head;
   return true;
 }
