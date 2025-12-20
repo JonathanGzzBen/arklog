@@ -15,7 +15,8 @@ bool alog_ring_buffer_push(AlogRingBuffer *ring, void *data) {
   assert(data != NULL);
 
   const size_t new_tail = (ring->tail + 1) % ring->capacity;
-  assert(new_tail != ring->head); // Full queue
+  if (new_tail == ring->head) // Full queue
+    return false;
   void *dest = (char *)ring->data + (ring->tail * ring->elem_size);
   memcpy(dest, data, ring->elem_size);
 
@@ -25,7 +26,9 @@ bool alog_ring_buffer_push(AlogRingBuffer *ring, void *data) {
 
 bool alog_ring_buffer_pop(AlogRingBuffer *ring, void *dest) {
   assert(ring != NULL);
-  assert(ring->head != ring->tail); // Empty queue
+  assert(dest != NULL);
+  if (ring->head == ring->tail) // Empty queue
+    return false;
 
   const size_t new_head = (ring->head + 1) % ring->capacity;
   void *data = (char *)ring->data + (ring->head * ring->elem_size);

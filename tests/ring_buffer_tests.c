@@ -1,4 +1,5 @@
 #include "ring_buffer_tests.h"
+#include "tests.h"
 
 #include <stdio.h>
 
@@ -7,15 +8,31 @@
 void test_ring_buffer(void) {
   puts("Testing ring buffer");
 
-  AlogRingBuffer ring_buffer = alog_ring_buffer_create(5, sizeof(int));
-  for (int i = 0; i < 5; i++) {
-    printf("Push %d\n", i + 1);
-    alog_ring_buffer_push(&ring_buffer, &i);
+  const size_t capacity_for_tests = 3;
+  AlogRingBuffer ring_buffer =
+      alog_ring_buffer_create(capacity_for_tests, sizeof(int));
+
+  bool test_res = false;
+  int test_data = 0;
+
+  for (size_t i = 0; i < capacity_for_tests; i++) {
+    if (!(test_res = alog_ring_buffer_push(&ring_buffer, &i)))
+      continue;
   }
-  for (int i = 0; i < 5; i++) {
-    printf("Popping %d\n", i);
+  test_condition("Can push until full", test_res);
+  test_res = alog_ring_buffer_push(&ring_buffer, &test_data);
+  test_condition("Push on full returns false", test_res == false);
+
+  for (size_t i = 0; i < capacity_for_tests; i++) {
     int data;
-    alog_ring_buffer_pop(&ring_buffer, &data);
-    printf("Element at index %d: %d\n", i, data);
+    if (!(test_res = alog_ring_buffer_pop(&ring_buffer, &data)))
+      continue;
   }
+  test_condition("Can pop until empty", test_res);
+  test_res = alog_ring_buffer_pop(&ring_buffer, &test_data);
+  test_condition("Pop on empty returns false", test_res == false);
+
+  test_res = alog_ring_buffer_push(&ring_buffer, &test_data);
+  test_res = alog_ring_buffer_pop(&ring_buffer, &test_data);
+  test_condition("Can push and pop", test_res);
 }
