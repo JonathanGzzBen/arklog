@@ -36,3 +36,8 @@ bool alog_ring_buffer_pop(AlogRingBuffer *ring, void *dest) {
   ring->head = new_head;
   return true;
 }
+
+void alog_ring_buffer_free(AlogRingBuffer *ring) {
+  free(ring->data);
+  memset(ring, 0, sizeof(AlogRingBuffer));
+}

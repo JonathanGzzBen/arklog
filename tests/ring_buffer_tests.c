@@ -33,4 +33,10 @@ void test_ring_buffer(void) {
   test_res = alog_ring_buffer_push(&ring_buffer, &test_data);
   test_res = alog_ring_buffer_pop(&ring_buffer, &test_data);
   test_condition("Can push and pop", test_res);
+
+  alog_ring_buffer_free(&ring_buffer);
+  test_condition("Free zeroes the structure",
+                 ring_buffer.data == NULL && ring_buffer.capacity == 0 &&
+                     ring_buffer.elem_size == 0 && ring_buffer.head == 0 &&
+                     ring_buffer.tail == 0);
 }
