@@ -6,8 +6,6 @@
 #include <arklog/ring_buffer.h>
 
 void test_ring_buffer(void) {
-  puts("Testing ring buffer");
-
   const size_t capacity_for_tests = 3;
   AlogRingBuffer ring_buffer =
       alog_ring_buffer_create(capacity_for_tests, sizeof(int));
