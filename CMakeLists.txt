@@ -72,7 +72,7 @@ if(USE_SANITIZERS)
     endif()
 endif()
 
-add_library(arklog_lib src/arklog.c)
+add_library(arklog_lib src/arklog.c src/ring_buffer.c)
 target_include_directories(arklog_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # apply custom compiler flags
@@ -87,5 +87,5 @@ foreach(compiler_flag ${custom_compiler_flags})
     endif()
 endforeach()
 
-add_executable(arklog_test tests/tests.c)
+add_executable(arklog_test tests/tests.c tests/ring_buffer_tests.c)
 target_link_libraries(arklog_test PRIVATE arklog_lib)
