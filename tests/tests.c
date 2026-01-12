@@ -31,7 +31,6 @@ void end_test_section(const char *const section_name) {
 }
 
 int main(void) {
-  ARKLOG_TRACE("Hola");
   start_test_section("RING BUFFER");
   test_ring_buffer();
   end_test_section("RING BUFFER");

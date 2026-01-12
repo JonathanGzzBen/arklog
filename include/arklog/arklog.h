@@ -8,13 +8,32 @@
 #define __FILENAME__                                                           \
   (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
+typedef struct AlogLoggerConfiguration {
+  size_t queue_size;
+  size_t max_message_length;
+  FILE *sink;
+} AlogLoggerConfiguration;
+
+typedef struct AlogLogger {
+  AlogRingBuffer ring_buffer;
+  void *memory;
+  FILE *sink;
+  size_t max_message_length;
+  bool valid;
+} AlogLogger;
+
+typedef struct Log {
+  size_t length;
+  char *message;
+} Log;
+
 // Producer
 // Will insert messages into the ring buffer
-void alog_log(int level, const char *file, int line, const char *func,
-              const char *fmt, ...);
+void alog_log(AlogLogger *logger, int level, const char *file, int line,
+              const char *func, const char *fmt, ...);
 
-#define ARKLOG_TRACE(...)                                                      \
-  alog_log(1, __FILENAME__, __LINE__, __func__, __VA_ARGS__)
+#define ARKLOG_TRACE(logger, ...)                                              \
+  alog_log(logger, 1, __FILENAME__, __LINE__, __func__, __VA_ARGS__)
 
 /*
 #define LOG_DEBUG(...) logger_log(LOG_LEVEL_DEBUG, __FILE__, __LINE__, __func__,
@@ -42,19 +61,8 @@ __LINE__, __func__, __VA_ARGS__)
  * already owned memory.
  */
 
-typedef struct AlogLoggerConfiguration {
-  size_t queue_size;
-  size_t max_message_length;
-  FILE *sink;
-} AlogLoggerConfiguration;
-
-typedef struct AlogLogger {
-  AlogRingBuffer *ring_buffer;
-  void *memory;
-  bool valid;
-} AlogLogger;
-
 AlogLogger alog_logger_create(AlogLoggerConfiguration configuration);
+void alog_logger_flush(AlogLogger *logger);
 void alog_logger_free(AlogLogger *logger);
 
 #endif // ARKLOG_H
