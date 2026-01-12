@@ -26,8 +26,12 @@ void test_logger(void) {
 
   alog_logger_flush(&logger);
 
+  alog_logger_start_flushing_thread(&logger);
+  test_condition("Can start flushing thread", true);
+
   alog_logger_free(&logger);
   test_condition("Can free valid logger", true);
+
   fclose(test_sink);
   remove(test_filename);
 }

@@ -2,6 +2,7 @@
 #define ARKLOG_H
 
 #include "arklog/ring_buffer.h"
+#include <pthread.h>
 #include <string.h>
 
 // Take only filename from __FILE__
@@ -19,6 +20,7 @@ typedef struct AlogLogger {
   void *memory;
   FILE *sink;
   size_t max_message_length;
+  pthread_t flushing_thread;
   bool valid;
 } AlogLogger;
 
@@ -63,6 +65,7 @@ __LINE__, __func__, __VA_ARGS__)
 
 AlogLogger alog_logger_create(AlogLoggerConfiguration configuration);
 void alog_logger_flush(AlogLogger *logger);
+void alog_logger_start_flushing_thread(AlogLogger *logger);
 void alog_logger_free(AlogLogger *logger);
 
 #endif // ARKLOG_H

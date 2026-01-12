@@ -1,8 +1,10 @@
 #include "arklog/arklog.h"
 #include "arklog/ring_buffer.h"
 #include <assert.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 void alog_log(AlogLogger *logger, int level, const char *file, int line,
               const char *func, const char *fmt, ...) {
@@ -39,6 +41,7 @@ AlogLogger alog_logger_create(AlogLoggerConfiguration configuration) {
                        .ring_buffer = NULL,
                        .sink = NULL,
                        .max_message_length = 0,
+                       .flushing_thread = 0,
                        .valid = false};
 
   if (configuration.sink == NULL) {
@@ -66,6 +69,17 @@ AlogLogger alog_logger_create(AlogLoggerConfiguration configuration) {
   return result;
 }
 
+static void *alog_logger_flush_continuous(void *hola) {
+  puts("Flushing continuously!");
+  return NULL;
+}
+
+void alog_logger_start_flushing_thread(AlogLogger *logger) {
+  assert(logger->flushing_thread == 0);
+  pthread_create(&logger->flushing_thread, NULL, alog_logger_flush_continuous,
+                 logger);
+}
+
 void alog_logger_flush(AlogLogger *logger) {
   while (!alog_ring_buffer_is_empty(logger->ring_buffer)) {
     static Log log;
@@ -78,6 +92,10 @@ void alog_logger_flush(AlogLogger *logger) {
 
 void alog_logger_free(AlogLogger *logger) {
   assert(logger->valid);
+  if (logger->flushing_thread != 0) {
+    pthread_cancel(logger->flushing_thread);
+    pthread_join(logger->flushing_thread, NULL);
+  }
   alog_ring_buffer_free(&logger->ring_buffer);
   free(logger->memory);
   logger->valid = false;
