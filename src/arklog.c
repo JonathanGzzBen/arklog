@@ -82,11 +82,10 @@ void alog_logger_start_flushing_thread(AlogLogger *logger) {
 
 void alog_logger_flush(AlogLogger *logger) {
   while (!alog_ring_buffer_is_empty(logger->ring_buffer)) {
-    static Log log;
-    assert(alog_ring_buffer_pop(&logger->ring_buffer, &log));
-    size_t message_length = log.length;
-    printf("message_length: %zu\n", message_length);
-    fwrite(log.message, log.length, 1, logger->sink);
+    Log *log = (Log *)logger->memory;
+    assert(alog_ring_buffer_pop(&logger->ring_buffer, log));
+    size_t message_length = log->length;
+    fwrite(log->message, log->length, 1, logger->sink);
   }
 }
 
