@@ -8,11 +8,18 @@
 
 void alog_log(AlogLogger *logger, int level, const char *file, int line,
               const char *func, const char *fmt, ...) {
+  if (logger->stop_flag)
+    return;
   // Example of desired output
   // [2024-12-09 15:30:45.123456] [Thread-12345] [INFO] [main.c:42] Application
   // started
   // Pending: Timestamp, Thread ID, debug level in text
+
+  // Tuve un problema usandolo como estatico pero es porque estaba
+  // copiando la direccion del mensaje, no el contenido.
+  // Usar memcpy resolvio el problema
   static char static_buf[1024];
+  // void *static_buf = malloc(1024);
   // memset(static_buf, 0, 1024);
   /**
    * TODO: Remover hardcodeo de longitud. Usar el static_buf cuando el mensaje
@@ -21,19 +28,20 @@ void alog_log(AlogLogger *logger, int level, const char *file, int line,
    * allocations en el hot path. Preferible en el push solo copiar esa cantidad
    * de bytes para que no sea una vulnerabilidad
    */
-  int message_length = snprintf(static_buf, logger->max_message_length,
-                                "[LEVEL %d] [%s:%d] [FUNC: %s] %s\n", level,
-                                file, line, func, fmt);
+
+  size_t message_length = snprintf(
+      static_buf + sizeof(size_t), logger->max_message_length,
+      "[LEVEL %d] [%s:%d] [FUNC: %s] %s\n", level, file, line, func, fmt);
+
+  memcpy(static_buf, &message_length, sizeof(size_t));
 
   assert(0 < message_length);
   assert(message_length < logger->max_message_length);
   assert(message_length < logger->ring_buffer.elem_size);
 
-  printf("%s", static_buf);
-
-  Log log = {.length = message_length, .message = static_buf};
-
-  assert(alog_ring_buffer_push(&logger->ring_buffer, &log));
+  pthread_mutex_lock(&logger->queue_lock);
+  assert(alog_ring_buffer_push(&logger->ring_buffer, static_buf));
+  pthread_mutex_unlock(&logger->queue_lock);
 }
 
 AlogLogger alog_logger_create(AlogLoggerConfiguration configuration) {
@@ -42,14 +50,16 @@ AlogLogger alog_logger_create(AlogLoggerConfiguration configuration) {
                        .sink = NULL,
                        .max_message_length = 0,
                        .flushing_thread = 0,
+                       .queue_lock = PTHREAD_MUTEX_INITIALIZER,
                        .valid = false};
 
   if (configuration.sink == NULL) {
     return result;
   }
 
-  size_t elem_size =
-      sizeof(size_t) + (configuration.max_message_length * sizeof(char));
+  size_t elem_size = sizeof(size_t) +
+                     (configuration.max_message_length * sizeof(char)) +
+                     sizeof(char); // Null char at end
 
   const size_t memory_amount = configuration.queue_size * elem_size;
   result.memory = malloc(memory_amount);
@@ -65,12 +75,26 @@ AlogLogger alog_logger_create(AlogLoggerConfiguration configuration) {
   result.sink = configuration.sink;
   result.ring_buffer = ring_buffer;
   result.max_message_length = configuration.max_message_length;
+  result.stop_flag = false;
   result.valid = true;
   return result;
 }
 
-static void *alog_logger_flush_continuous(void *hola) {
-  puts("Flushing continuously!");
+static void *alog_logger_flush_continuous(void *logger) {
+  AlogLogger *alog_logger = logger;
+  while (!alog_logger->stop_flag) {
+    pthread_mutex_lock(&alog_logger->queue_lock);
+    if (!alog_ring_buffer_pop(&alog_logger->ring_buffer, alog_logger->memory)) {
+      pthread_mutex_unlock(&alog_logger->queue_lock);
+      continue;
+    }
+    pthread_mutex_unlock(&alog_logger->queue_lock);
+    size_t message_size = 0;
+    memcpy(&message_size, alog_logger->memory, sizeof(size_t));
+    fwrite(alog_logger->memory + sizeof(size_t), message_size, 1,
+           alog_logger->sink);
+  }
+  alog_logger_flush(logger);
   return NULL;
 }
 
@@ -82,17 +106,20 @@ void alog_logger_start_flushing_thread(AlogLogger *logger) {
 
 void alog_logger_flush(AlogLogger *logger) {
   while (!alog_ring_buffer_is_empty(logger->ring_buffer)) {
-    Log *log = (Log *)logger->memory;
-    assert(alog_ring_buffer_pop(&logger->ring_buffer, log));
-    size_t message_length = log->length;
-    fwrite(log->message, log->length, 1, logger->sink);
+    pthread_mutex_lock(&logger->queue_lock);
+    assert(alog_ring_buffer_pop(&logger->ring_buffer, logger->memory));
+    pthread_mutex_unlock(&logger->queue_lock);
+    size_t message_size = 0;
+    memcpy(&message_size, logger->memory, sizeof(size_t));
+    fwrite(logger->memory + sizeof(size_t), message_size, 1, logger->sink);
   }
+  fflush(logger->sink);
 }
 
 void alog_logger_free(AlogLogger *logger) {
   assert(logger->valid);
   if (logger->flushing_thread != 0) {
-    pthread_cancel(logger->flushing_thread);
+    logger->stop_flag = true;
     pthread_join(logger->flushing_thread, NULL);
   }
   alog_ring_buffer_free(&logger->ring_buffer);

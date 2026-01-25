@@ -21,6 +21,8 @@ typedef struct AlogLogger {
   FILE *sink;
   size_t max_message_length;
   pthread_t flushing_thread;
+  bool stop_flag;
+  pthread_mutex_t queue_lock;
   bool valid;
 } AlogLogger;
 

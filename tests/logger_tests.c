@@ -19,12 +19,13 @@ void test_logger(void) {
   logger = alog_logger_create(valid_configuration);
   test_condition("Can create logger with valid configuration", logger.valid);
 
-  ARKLOG_TRACE(&logger, "Hola");
+  ARKLOG_TRACE(&logger, "Hola primero");
+  ARKLOG_TRACE(&logger, "Hola 2");
 
   size_t count = logger.ring_buffer.tail - logger.ring_buffer.head;
-  test_condition("Can queue one message", count == 1);
+  test_condition("Can queue two messages", count == 2);
 
-  alog_logger_flush(&logger);
+  // alog_logger_flush(&logger);
 
   alog_logger_start_flushing_thread(&logger);
   test_condition("Can start flushing thread", true);
