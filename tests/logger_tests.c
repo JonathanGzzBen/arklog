@@ -1,7 +1,9 @@
 #include "logger_tests.h"
 #include "arklog/arklog.h"
+#include "arklog/ring_buffer.h"
 #include "tests.h"
 #include <stdio.h>
+#include <unistd.h>
 
 void test_logger(void) {
   AlogLoggerConfiguration invalid_configuration = {.queue_size = 2,
@@ -20,7 +22,7 @@ void test_logger(void) {
   test_condition("Can create logger with valid configuration", logger.valid);
 
   ARKLOG_TRACE(&logger, "Hola primero");
-  ARKLOG_TRACE(&logger, "Hola 2");
+  ARKLOG_TRACE(&logger, "Hola desde PID %d", getpid());
 
   size_t count = logger.ring_buffer.tail - logger.ring_buffer.head;
   test_condition("Can queue two messages", count == 2);
@@ -32,7 +34,6 @@ void test_logger(void) {
 
   alog_logger_free(&logger);
   test_condition("Can free valid logger", true);
-
   fclose(test_sink);
   remove(test_filename);
 }

@@ -2,6 +2,7 @@
 #include "arklog/ring_buffer.h"
 #include <assert.h>
 #include <pthread.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -29,9 +30,18 @@ void alog_log(AlogLogger *logger, int level, const char *file, int line,
    * de bytes para que no sea una vulnerabilidad
    */
 
-  size_t message_length = snprintf(
-      static_buf + sizeof(size_t), logger->max_message_length,
-      "[LEVEL %d] [%s:%d] [FUNC: %s] %s\n", level, file, line, func, fmt);
+  const size_t log_details_length =
+      snprintf(static_buf + sizeof(size_t), logger->max_message_length,
+               "[LEVEL %d] [%s:%d] [FUNC: %s] ", level, file, line, func);
+  va_list fmt_args;
+  va_start(fmt_args, fmt);
+  const size_t log_message_length = vsnprintf(
+      static_buf + sizeof(size_t) + (log_details_length * sizeof(char)),
+      logger->max_message_length - log_details_length, fmt, fmt_args);
+  va_end(fmt_args);
+  static_buf[sizeof(size_t) + log_details_length + log_message_length] = '\n';
+  const size_t message_length =
+      log_details_length + log_message_length + 1; // Line break
 
   memcpy(static_buf, &message_length, sizeof(size_t));
 
