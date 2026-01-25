@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 void alog_log(AlogLogger *logger, int level, const char *file, int line,
               const char *func, const char *fmt, ...) {
@@ -95,7 +96,13 @@ static void *alog_logger_flush_continuous(void *logger) {
   while (!alog_logger->stop_flag) {
     pthread_mutex_lock(&alog_logger->queue_lock);
     if (!alog_ring_buffer_pop(&alog_logger->ring_buffer, alog_logger->memory)) {
+      // If queue was empty
       pthread_mutex_unlock(&alog_logger->queue_lock);
+      // TODO: Define a configurable polling rate even when not empty
+      struct timespec ts;
+      ts.tv_sec = 0;
+      ts.tv_nsec = 100000000L; // 100ms
+      nanosleep(&ts, NULL);
       continue;
     }
     pthread_mutex_unlock(&alog_logger->queue_lock);
