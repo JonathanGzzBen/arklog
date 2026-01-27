@@ -89,3 +89,4 @@ endforeach()
 
 add_executable(arklog_test tests/tests.c tests/ring_buffer_tests.c tests/logger_tests.c)
 target_link_libraries(arklog_test PRIVATE arklog_lib)
+target_compile_definitions(arklog_test PRIVATE _GNU_SOURCE) # For gettid() on linux

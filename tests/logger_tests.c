@@ -2,9 +2,32 @@
 #include "arklog/arklog.h"
 #include "arklog/ring_buffer.h"
 #include "tests.h"
+#include <pthread.h>
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
+
+#define INTEGRITY_TEST_MSG_MAX_LEN 200
+
+typedef struct LoggingThread {
+  AlogLogger *logger;
+  size_t sequence;
+  pthread_t thread;
+  pid_t tid;
+} LoggingThread;
+
+void *log_sequence_number(void *logging_thread_ptr);
+
+void *log_sequence_number(void *logging_thread_ptr) {
+  LoggingThread *logging_thread = (LoggingThread *)logging_thread_ptr;
+  const pid_t tid = gettid();
+  logging_thread->tid = tid;
+  ARKLOG_TRACE(logging_thread->logger, "[Thread %d] [Sequence %zu]", tid,
+               logging_thread->sequence);
+  return NULL;
+}
+
+void test_multiple_producer_integrity(void);
 
 void test_logger(void) {
   AlogLoggerConfiguration invalid_configuration = {.queue_size = 2,
@@ -41,10 +64,56 @@ void test_logger(void) {
     ts.tv_nsec = 100000000L; // 100ms
     nanosleep(&ts, NULL);
   }
-  test_condition("Flushing thread can empty queue", true);
+  test_condition("Flushing thread can empty queue",
+                 true); // TODO: Make ring queue lock free, and MPMC later
+
+  test_multiple_producer_integrity();
 
   alog_logger_free(&logger);
   test_condition("Can free valid logger", true);
   fclose(test_sink);
   remove(test_filename);
+}
+
+void test_multiple_producer_integrity(void) {
+  static const char *integrity_test_filename = "integrity.txt";
+  FILE *test_sink = fopen(integrity_test_filename, "wr+");
+  const int n_producers = 5;
+  AlogLoggerConfiguration valid_configuration = {
+      .queue_size = (size_t)n_producers,
+      .max_message_length = INTEGRITY_TEST_MSG_MAX_LEN,
+      .sink = test_sink};
+  AlogLogger logger = alog_logger_create(valid_configuration);
+  LoggingThread args[n_producers];
+  for (int i = 0; i < n_producers; i++) {
+    args[i].logger = &logger;
+    args[i].sequence = (size_t)i;
+  }
+  for (int i = 0; i < n_producers; i++) {
+    pthread_create(&args[i].thread, NULL, log_sequence_number, &args[i]);
+  }
+  for (int i = 0; i < n_producers; i++) {
+    pthread_join(args[i].thread, NULL);
+  }
+  alog_logger_flush(&logger);
+  alog_logger_free(&logger);
+  fclose(test_sink);
+
+  // Now reopen sink to verify integrity
+  FILE *input_sink = fopen(integrity_test_filename, "r");
+  int valid_messages_count = 0;
+  char log_line_read[INTEGRITY_TEST_MSG_MAX_LEN] = {0};
+  for (int i = 0; i < n_producers; i++) {
+    fgets(log_line_read, INTEGRITY_TEST_MSG_MAX_LEN, input_sink);
+    pid_t tid_read = (pid_t)strtol(log_line_read + 66, NULL, 10);
+    size_t sequence_read = (size_t)strtol(log_line_read + 82, NULL, 10);
+
+    // Compare real TID with TID read from sink
+    if (args[sequence_read].tid == tid_read)
+      valid_messages_count++;
+  }
+  test_condition("Maintain integrity with multiple producers",
+                 valid_messages_count == n_producers);
+  fclose(input_sink);
+  remove(integrity_test_filename);
 }
