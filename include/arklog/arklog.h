@@ -9,10 +9,20 @@
 #define __FILENAME__                                                           \
   (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
+typedef enum LogLevel {
+  LOG_LEVEL_FATAL,
+  LOG_LEVEL_ERROR,
+  LOG_LEVEL_WARN,
+  LOG_LEVEL_INFO,
+  LOG_LEVEL_DEBUG,
+  LOG_LEVEL_TRACE
+} LogLevel;
+
 typedef struct AlogLoggerConfiguration {
   size_t queue_size;
   size_t max_message_length;
   FILE *sink;
+  LogLevel initial_log_level;
 } AlogLoggerConfiguration;
 
 typedef struct AlogLogger {
@@ -23,6 +33,7 @@ typedef struct AlogLogger {
   pthread_t flushing_thread;
   bool stop_flag;
   pthread_mutex_t queue_lock;
+  LogLevel current_log_level;
   bool valid;
 } AlogLogger;
 
@@ -37,7 +48,12 @@ void alog_log(AlogLogger *logger, int level, const char *file, int line,
               const char *func, const char *fmt, ...);
 
 #define ARKLOG_TRACE(logger, ...)                                              \
-  alog_log(logger, 5, __FILENAME__, __LINE__, __func__, __VA_ARGS__)
+  alog_log(logger, LOG_LEVEL_TRACE, __FILENAME__, __LINE__, __func__,          \
+           __VA_ARGS__)
+
+#define ARKLOG_INFO(logger, ...)                                               \
+  alog_log(logger, LOG_LEVEL_INFO, __FILENAME__, __LINE__, __func__,           \
+           __VA_ARGS__)
 
 /*
 #define LOG_DEBUG(...) logger_log(LOG_LEVEL_DEBUG, __FILE__, __LINE__, __func__,
@@ -65,9 +81,11 @@ __LINE__, __func__, __VA_ARGS__)
  * already owned memory.
  */
 
-AlogLogger alog_logger_create(AlogLoggerConfiguration configuration);
+__attribute__((warn_unused_result)) AlogLogger
+alog_logger_create(AlogLoggerConfiguration configuration);
 void alog_logger_flush(AlogLogger *logger);
 void alog_logger_start_flushing_thread(AlogLogger *logger);
+void alog_logger_set_log_level(AlogLogger *logger, LogLevel log_level);
 void alog_logger_free(AlogLogger *logger);
 
 #endif // ARKLOG_H

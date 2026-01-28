@@ -13,7 +13,8 @@ static const char *debug_types_str[] = {"FATAL", "ERROR", "WARN",
 
 void alog_log(AlogLogger *logger, int level, const char *file, int line,
               const char *func, const char *fmt, ...) {
-  if (logger->stop_flag)
+  assert(logger != NULL);
+  if (logger->stop_flag || logger->current_log_level < level)
     return;
   // Example of desired output
   // [2024-12-09 15:30:45.123456] [Thread-12345] [INFO] [main.c:42] Application
@@ -67,9 +68,17 @@ AlogLogger alog_logger_create(AlogLoggerConfiguration configuration) {
                        .max_message_length = 0,
                        .flushing_thread = 0,
                        .queue_lock = PTHREAD_MUTEX_INITIALIZER,
+                       .current_log_level = LOG_LEVEL_FATAL,
                        .valid = false};
 
   if (configuration.sink == NULL) {
+    return result;
+  }
+
+  assert(LOG_LEVEL_FATAL <= configuration.initial_log_level &&
+         configuration.initial_log_level <= LOG_LEVEL_TRACE);
+  if (configuration.initial_log_level < LOG_LEVEL_FATAL ||
+      LOG_LEVEL_TRACE < configuration.initial_log_level) {
     return result;
   }
 
@@ -92,6 +101,7 @@ AlogLogger alog_logger_create(AlogLoggerConfiguration configuration) {
   result.ring_buffer = ring_buffer;
   result.max_message_length = configuration.max_message_length;
   result.stop_flag = false;
+  result.current_log_level = configuration.initial_log_level;
   result.valid = true;
   return result;
 }
@@ -136,6 +146,10 @@ void alog_logger_flush(AlogLogger *logger) {
     fwrite(logger->memory + sizeof(size_t), message_size, 1, logger->sink);
   }
   fflush(logger->sink);
+}
+
+void alog_logger_set_log_level(AlogLogger *logger, LogLevel log_level) {
+  logger->current_log_level = log_level;
 }
 
 void alog_logger_free(AlogLogger *logger) {
