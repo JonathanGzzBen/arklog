@@ -1,2 +1,0 @@
-[LEVEL TRACE] [logger_tests.c:48] [FUNC: test_logger] Hola primero
-[LEVEL TRACE] [logger_tests.c:49] [FUNC: test_logger] Hola desde PID 7355

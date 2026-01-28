@@ -40,16 +40,20 @@ void test_logger(void) {
   static const char *test_filename = "hola.txt";
   FILE *test_sink = fopen(test_filename, "w+");
 
-  AlogLoggerConfiguration valid_configuration = {
-      .queue_size = 2, .max_message_length = 500, .sink = test_sink};
+  static const size_t num_test_logs = 50;
+
+  AlogLoggerConfiguration valid_configuration = {.queue_size = num_test_logs,
+                                                 .max_message_length = 500,
+                                                 .sink = test_sink};
   logger = alog_logger_create(valid_configuration);
   test_condition("Can create logger with valid configuration", logger.valid);
 
-  ARKLOG_TRACE(&logger, "Hola primero");
-  ARKLOG_TRACE(&logger, "Hola desde PID %d", getpid());
+  for (size_t i = 0; i < num_test_logs; i++) {
+    ARKLOG_TRACE(&logger, "This is the log %d.", i);
+  }
 
-  size_t count = logger.ring_buffer.tail - logger.ring_buffer.head;
-  test_condition("Can queue two messages", count == 2);
+  const size_t count = logger.ring_buffer.tail - logger.ring_buffer.head;
+  test_condition("Can queue messages", count == num_test_logs);
 
   alog_logger_start_flushing_thread(&logger);
   test_condition("Can start flushing thread", true);
@@ -66,13 +70,12 @@ void test_logger(void) {
   }
   test_condition("Flushing thread can empty queue",
                  true); // TODO: Make ring queue lock free, and MPMC later
-
-  test_multiple_producer_integrity();
-
   alog_logger_free(&logger);
   test_condition("Can free valid logger", true);
   fclose(test_sink);
   remove(test_filename);
+
+  test_multiple_producer_integrity();
 }
 
 void test_multiple_producer_integrity(void) {
