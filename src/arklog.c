@@ -8,6 +8,9 @@
 #include <time.h>
 #include <unistd.h>
 
+static const char *debug_types_str[] = {"FATAL", "ERROR", "WARN",
+                                        "INFO",  "DEBUG", "TRACE"};
+
 void alog_log(AlogLogger *logger, int level, const char *file, int line,
               const char *func, const char *fmt, ...) {
   if (logger->stop_flag)
@@ -31,9 +34,11 @@ void alog_log(AlogLogger *logger, int level, const char *file, int line,
    * de bytes para que no sea una vulnerabilidad
    */
 
+  assert(0 <= level && level < 6);
   const size_t log_details_length =
       snprintf(static_buf + sizeof(size_t), logger->max_message_length,
-               "[LEVEL %d] [%s:%d] [FUNC: %s] ", level, file, line, func);
+               "[LEVEL %5s] [%s:%d] [FUNC: %s] ", debug_types_str[level], file,
+               line, func);
   va_list fmt_args;
   va_start(fmt_args, fmt);
   const size_t log_message_length = vsnprintf(

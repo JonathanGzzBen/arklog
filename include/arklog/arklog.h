@@ -37,7 +37,7 @@ void alog_log(AlogLogger *logger, int level, const char *file, int line,
               const char *func, const char *fmt, ...);
 
 #define ARKLOG_TRACE(logger, ...)                                              \
-  alog_log(logger, 1, __FILENAME__, __LINE__, __func__, __VA_ARGS__)
+  alog_log(logger, 5, __FILENAME__, __LINE__, __func__, __VA_ARGS__)
 
 /*
 #define LOG_DEBUG(...) logger_log(LOG_LEVEL_DEBUG, __FILE__, __LINE__, __func__,

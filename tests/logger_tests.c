@@ -105,8 +105,8 @@ void test_multiple_producer_integrity(void) {
   char log_line_read[INTEGRITY_TEST_MSG_MAX_LEN] = {0};
   for (int i = 0; i < n_producers; i++) {
     fgets(log_line_read, INTEGRITY_TEST_MSG_MAX_LEN, input_sink);
-    pid_t tid_read = (pid_t)strtol(log_line_read + 66, NULL, 10);
-    size_t sequence_read = (size_t)strtol(log_line_read + 82, NULL, 10);
+    pid_t tid_read = (pid_t)strtol(log_line_read + 70, NULL, 10);
+    size_t sequence_read = (size_t)strtol(log_line_read + 86, NULL, 10);
 
     // Compare real TID with TID read from sink
     if (args[sequence_read].tid == tid_read)
