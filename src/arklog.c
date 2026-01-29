@@ -20,37 +20,23 @@ void alog_log(AlogLogger *logger, int level, const char *file, int line,
   // [2024-12-09 15:30:45.123456] [Thread-12345] [INFO] [main.c:42] Application
   // started
   // Pending: Timestamp, Thread ID, debug level in text
-
-  // Tuve un problema usandolo como estatico pero es porque estaba
-  // copiando la direccion del mensaje, no el contenido.
-  // Usar memcpy resolvio el problema
-  static char static_buf[1024];
-  // void *static_buf = malloc(1024);
-  // memset(static_buf, 0, 1024);
-  /**
-   * TODO: Remover hardcodeo de longitud. Usar el static_buf cuando el mensaje
-   * quepa ahi, de lo contrario, tener un buffer en heap con espacio extra y que
-   * vaya creciendo conforme se necesite. Asi es dinamico y se evitan memory
-   * allocations en el hot path. Preferible en el push solo copiar esa cantidad
-   * de bytes para que no sea una vulnerabilidad
-   */
-
   assert(0 <= level && level < 6);
   const size_t log_details_length =
-      snprintf(static_buf + sizeof(size_t), logger->max_message_length,
+      snprintf(logger->memory + sizeof(size_t), logger->max_message_length,
                "[LEVEL %5s] [%s:%d] [FUNC: %s] ", debug_types_str[level], file,
                line, func);
   va_list fmt_args;
   va_start(fmt_args, fmt);
   const size_t log_message_length = vsnprintf(
-      static_buf + sizeof(size_t) + (log_details_length * sizeof(char)),
+      logger->memory + sizeof(size_t) + (log_details_length * sizeof(char)),
       logger->max_message_length - log_details_length, fmt, fmt_args);
   va_end(fmt_args);
-  static_buf[sizeof(size_t) + log_details_length + log_message_length] = '\n';
+  logger->memory[sizeof(size_t) + log_details_length + log_message_length] =
+      '\n';
   const size_t message_length =
       log_details_length + log_message_length + 1; // Line break
 
-  memcpy(static_buf, &message_length, sizeof(size_t));
+  memcpy(logger->memory, &message_length, sizeof(size_t));
 
   assert(0 < message_length);
   assert(message_length < logger->max_message_length);
@@ -59,7 +45,7 @@ void alog_log(AlogLogger *logger, int level, const char *file, int line,
   pthread_mutex_lock(&logger->queue_lock);
   alog_ring_buffer_push(
       &logger->ring_buffer,
-      static_buf); // Ignore even if push fails because queue was full
+      logger->memory); // Ignore even if push fails because queue was full
   pthread_mutex_unlock(&logger->queue_lock);
 }
 
@@ -84,19 +70,17 @@ AlogLogger alog_logger_create(AlogLoggerConfiguration configuration) {
     return result;
   }
 
-  size_t elem_size = sizeof(size_t) +
-                     (configuration.max_message_length * sizeof(char)) +
-                     sizeof(char); // Null char at end
-
-  const size_t memory_amount = configuration.queue_size * elem_size;
-  result.memory = malloc(memory_amount);
+  const size_t log_size = sizeof(size_t) +
+                          (configuration.max_message_length * sizeof(char)) +
+                          sizeof(char); // Null char at end
+  result.memory = malloc(log_size);
   assert(result.memory != NULL);
   if (result.memory == NULL) {
     return result;
   }
 
   AlogRingBuffer ring_buffer =
-      alog_ring_buffer_create(configuration.queue_size, elem_size);
+      alog_ring_buffer_create(configuration.queue_size, log_size);
 
   assert(configuration.sink != NULL);
   result.sink = configuration.sink;

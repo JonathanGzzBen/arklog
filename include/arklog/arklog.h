@@ -27,7 +27,7 @@ typedef struct AlogLoggerConfiguration {
 
 typedef struct AlogLogger {
   AlogRingBuffer ring_buffer;
-  void *memory;
+  char *memory; // Fomat: size_t + max_message_length + null char
   FILE *sink;
   size_t max_message_length;
   pthread_t flushing_thread;
