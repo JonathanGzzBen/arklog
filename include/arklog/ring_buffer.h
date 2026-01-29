@@ -19,6 +19,7 @@ typedef struct AlogRingBuffer {
 AlogRingBuffer alog_ring_buffer_create(size_t elem_count, size_t elem_size);
 bool alog_ring_buffer_push(AlogRingBuffer *ring, void *data);
 bool alog_ring_buffer_pop(AlogRingBuffer *ring, void *dest);
+bool alog_ring_buffer_is_empty(AlogRingBuffer ring);
 void alog_ring_buffer_free(AlogRingBuffer *ring);
 
 #endif // ARKLOG_RING_BUFFER_H

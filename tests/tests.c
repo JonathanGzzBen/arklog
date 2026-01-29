@@ -1,5 +1,6 @@
 #include "tests.h"
 #include "arklog/arklog.h"
+#include "logger_tests.h"
 #include "ring_buffer_tests.h"
 
 #include <stdbool.h>
@@ -30,9 +31,11 @@ void end_test_section(const char *const section_name) {
 }
 
 int main(void) {
-  ARKLOG_TRACE("Hola");
   start_test_section("RING BUFFER");
   test_ring_buffer();
   end_test_section("RING BUFFER");
+  start_test_section("LOGGER");
+  test_logger();
+  end_test_section("LOGGER");
   return 0;
 }

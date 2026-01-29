@@ -37,6 +37,10 @@ bool alog_ring_buffer_pop(AlogRingBuffer *ring, void *dest) {
   return true;
 }
 
+bool alog_ring_buffer_is_empty(AlogRingBuffer ring) {
+  return (ring.tail - ring.head) == 0;
+}
+
 void alog_ring_buffer_free(AlogRingBuffer *ring) {
   free(ring->data);
   memset(ring, 0, sizeof(AlogRingBuffer));

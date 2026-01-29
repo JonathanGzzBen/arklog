@@ -6,7 +6,7 @@ include(CheckCCompilerFlag)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_C_EXTENSIONS ON) # Used for nanosleep()
 
 set(custom_compiler_flags)
 if (("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU"))
@@ -87,5 +87,6 @@ foreach(compiler_flag ${custom_compiler_flags})
     endif()
 endforeach()
 
-add_executable(arklog_test tests/tests.c tests/ring_buffer_tests.c)
+add_executable(arklog_test tests/tests.c tests/ring_buffer_tests.c tests/logger_tests.c)
 target_link_libraries(arklog_test PRIVATE arklog_lib)
+target_compile_definitions(arklog_test PRIVATE _GNU_SOURCE) # For gettid() on linux
