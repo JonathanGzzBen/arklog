@@ -21,26 +21,38 @@ void alog_log(AlogLogger *logger, int level, const char *file, int line,
   // started
   // Pending: Timestamp, Thread ID, debug level in text
   assert(0 <= level && level < 6);
-  const size_t log_details_length =
+  const size_t log_header_length =
       snprintf(logger->memory + sizeof(size_t), logger->max_message_length,
                "[LEVEL %5s] [%s:%d] [FUNC: %s] ", debug_types_str[level], file,
                line, func);
   va_list fmt_args;
   va_start(fmt_args, fmt);
-  const size_t log_message_length = vsnprintf(
-      logger->memory + sizeof(size_t) + (log_details_length * sizeof(char)),
-      logger->max_message_length - log_details_length, fmt, fmt_args);
-  va_end(fmt_args);
-  logger->memory[sizeof(size_t) + log_details_length + log_message_length] =
-      '\n';
-  const size_t message_length =
-      log_details_length + log_message_length + 1; // Line break
+  size_t bytes_to_write = (log_header_length < logger->max_message_length)
+                              ? log_header_length
+                              : logger->max_message_length;
 
-  memcpy(logger->memory, &message_length, sizeof(size_t));
+  size_t log_message_length = 0;
+  if (bytes_to_write < logger->max_message_length) {
+    log_message_length = vsnprintf(
+        logger->memory + sizeof(size_t) + (log_header_length * sizeof(char)),
+        logger->max_message_length - log_header_length, fmt, fmt_args);
+    va_end(fmt_args);
 
-  assert(0 < message_length);
-  assert(message_length < logger->max_message_length);
-  assert(message_length < logger->ring_buffer.elem_size);
+    bytes_to_write += log_message_length;
+    bytes_to_write =
+        (bytes_to_write < logger->max_message_length)
+            ? bytes_to_write
+            : logger->max_message_length - 1; // Make space for line break
+  }
+
+  // Write size of log into memory
+  logger->memory[sizeof(size_t) + (bytes_to_write * sizeof(char))] = '\n';
+  bytes_to_write++; // Line break
+  memcpy(logger->memory, &bytes_to_write, sizeof(size_t));
+
+  assert(0 < bytes_to_write);
+  assert(bytes_to_write <= (logger->max_message_length));
+  assert(bytes_to_write < logger->ring_buffer.elem_size);
 
   pthread_mutex_lock(&logger->queue_lock);
   alog_ring_buffer_push(

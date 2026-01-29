@@ -47,7 +47,7 @@ void test_logger(void) {
   static const size_t num_test_logs = 10;
 
   AlogLoggerConfiguration valid_configuration = {.queue_size = num_test_logs,
-                                                 .max_message_length = 500,
+                                                 .max_message_length = 100,
                                                  .sink = test_sink,
                                                  .initial_log_level =
                                                      LOG_LEVEL_TRACE};
@@ -79,6 +79,13 @@ void test_logger(void) {
   }
   test_condition("Flushing thread can empty queue",
                  true); // TODO: Make ring queue lock free, and MPMC later
+
+  ARKLOG_TRACE(
+      &logger,
+      "Lorem ipsum dolor sit amet, consectetur adipiscing "
+      "elit. Integer fringilla ligula augue, ac gravida."); // 100 chars long
+  test_condition("Can log message exceeding max_message_length", true);
+
   alog_logger_free(&logger);
   test_condition("Can free valid logger", true);
   fclose(test_sink);
