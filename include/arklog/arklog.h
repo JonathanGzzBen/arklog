@@ -65,22 +65,6 @@ __VA_ARGS__) #define LOG_FATAL(...) logger_log(LOG_LEVEL_FATAL, __FILE__,
 __LINE__, __func__, __VA_ARGS__)
 * */
 
-/**
- * Define intialization functions to configure logger, including memory
- * allocator
- *
- * The flow would involve the 'log' function registering a message into an
- * internal ring buffer.
- *
- * The initialization of the logger should have enough information to allocate
- * all required memory.
- *
- * No further allocations should be needed other than in initialization.
- *
- * When a message is registered using a 'log' function, it is copied into the
- * already owned memory.
- */
-
 __attribute__((warn_unused_result)) AlogLogger
 alog_logger_create(AlogLoggerConfiguration configuration);
 void alog_logger_flush(AlogLogger *logger);
