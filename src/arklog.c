@@ -57,7 +57,9 @@ void alog_log(AlogLogger *logger, int level, const char *file, int line,
   assert(message_length < logger->ring_buffer.elem_size);
 
   pthread_mutex_lock(&logger->queue_lock);
-  assert(alog_ring_buffer_push(&logger->ring_buffer, static_buf));
+  alog_ring_buffer_push(
+      &logger->ring_buffer,
+      static_buf); // Ignore even if push fails because queue was full
   pthread_mutex_unlock(&logger->queue_lock);
 }
 

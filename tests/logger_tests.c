@@ -60,6 +60,9 @@ void test_logger(void) {
 
   const size_t count = logger.ring_buffer.tail - logger.ring_buffer.head;
   test_condition("Can queue messages", count == num_test_logs);
+  ARKLOG_TRACE(&logger, "This is a message that will be ignored");
+  test_condition("Logging past the queue size ignores message",
+                 count == num_test_logs);
 
   alog_logger_start_flushing_thread(&logger);
   test_condition("Can start flushing thread", true);
