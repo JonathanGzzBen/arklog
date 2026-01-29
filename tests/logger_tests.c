@@ -31,9 +31,6 @@ void test_multiple_producer_integrity(void);
 void test_log_levels(void);
 
 void test_logger(void) {
-  // TODO: Improve tests for log level filtering
-  // TODO: Add timestamp to logs
-
   AlogLoggerConfiguration invalid_configuration = {.queue_size = 2,
                                                    .max_message_length = 500};
 
