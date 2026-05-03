@@ -72,7 +72,11 @@ if(USE_SANITIZERS)
     endif()
 endif()
 
-add_library(arklog_lib src/arklog.c src/ring_buffer.c)
+add_library(arklog_lib
+                src/arklog.c
+                src/mutex_locked_queue.c
+                src/lockfree_mpmc_queue.c
+                src/lockfree_mpsc_queue.c)
 target_include_directories(arklog_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # apply custom compiler flags
@@ -87,6 +91,11 @@ foreach(compiler_flag ${custom_compiler_flags})
     endif()
 endforeach()
 
-add_executable(arklog_test tests/tests.c tests/ring_buffer_tests.c tests/logger_tests.c)
+add_executable(arklog_test
+                tests/tests.c
+                tests/mutex_locked_queue_tests.c
+                tests/lockfree_mpmc_queue_tests.c
+                tests/lockfree_mpsc_queue_tests.c
+                tests/logger_tests.c)
 target_link_libraries(arklog_test PRIVATE arklog_lib)
 target_compile_definitions(arklog_test PRIVATE _GNU_SOURCE) # For gettid() on linux
