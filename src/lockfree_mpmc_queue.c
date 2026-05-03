@@ -1,4 +1,4 @@
-#include "arklog/lockfree_queue.h"
+#include "arklog/lockfree_mpmc_queue.h"
 
 #include <assert.h>
 #include <stdatomic.h>
@@ -6,8 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-AlogLockfreeQueue alog_lockfree_queue_create(size_t elem_count,
-                                             size_t elem_size) {
+AlogLockfreeMpmcQueue alog_lockfree_mpmc_queue_create(size_t elem_count,
+                                                      size_t elem_size) {
   const size_t capacity = elem_count;
 
   _Atomic size_t *sequences = malloc(capacity * sizeof(_Atomic size_t));
@@ -20,7 +20,7 @@ AlogLockfreeQueue alog_lockfree_queue_create(size_t elem_count,
     atomic_init(&sequences[i], i);
   }
 
-  AlogLockfreeQueue queue;
+  AlogLockfreeMpmcQueue queue;
   queue.sequences = sequences;
   queue.data = data;
   queue.capacity = capacity;
@@ -41,7 +41,7 @@ AlogLockfreeQueue alog_lockfree_queue_create(size_t elem_count,
  * sequence flag that advertises it.
  */
 
-bool alog_lockfree_queue_push(AlogLockfreeQueue *queue, void *data) {
+bool alog_lockfree_mpmc_queue_push(AlogLockfreeMpmcQueue *queue, void *data) {
   assert(queue != NULL);
   assert(data != NULL);
 
@@ -71,7 +71,7 @@ bool alog_lockfree_queue_push(AlogLockfreeQueue *queue, void *data) {
   }
 }
 
-bool alog_lockfree_queue_pop(AlogLockfreeQueue *queue, void *dest) {
+bool alog_lockfree_mpmc_queue_pop(AlogLockfreeMpmcQueue *queue, void *dest) {
   assert(queue != NULL);
   assert(dest != NULL);
 
@@ -101,7 +101,7 @@ bool alog_lockfree_queue_pop(AlogLockfreeQueue *queue, void *dest) {
   }
 }
 
-void alog_lockfree_queue_free(AlogLockfreeQueue *queue) {
+void alog_lockfree_mpmc_queue_free(AlogLockfreeMpmcQueue *queue) {
   free(queue->sequences);
   free(queue->data);
   queue->sequences = NULL;

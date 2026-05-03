@@ -54,7 +54,7 @@ void test_logger(void) {
     ARKLOG_TRACE(&logger, "This is the log %d.", i);
   }
 
-  const size_t count = logger.queue.locked.tail - logger.queue.locked.head;
+  const size_t count = logger.queue.mutex_locked.tail - logger.queue.mutex_locked.head;
   test_condition("Can queue messages", count == num_test_logs);
   ARKLOG_TRACE(&logger, "This is a message that will be ignored");
   test_condition("Logging past the queue size ignores message",
@@ -64,7 +64,7 @@ void test_logger(void) {
   test_condition("Can start flushing thread", true);
   while (true) {
     pthread_mutex_lock(&logger.queue_lock);
-    bool empty = logger.queue.locked.head == logger.queue.locked.tail;
+    bool empty = logger.queue.mutex_locked.head == logger.queue.mutex_locked.tail;
     pthread_mutex_unlock(&logger.queue_lock);
     if (empty)
       break;

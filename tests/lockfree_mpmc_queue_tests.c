@@ -1,4 +1,4 @@
-#include "lockfree_queue_tests.h"
+#include "lockfree_mpmc_queue_tests.h"
 #include "tests.h"
 
 #include <assert.h>
@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <arklog/lockfree_queue.h>
+#include <arklog/lockfree_mpmc_queue.h>
 
 #define CONCURRENT_ITEM_COUNT 10000
 
@@ -18,24 +18,24 @@
 #define MPMC_QUEUE_SIZE         64
 
 typedef struct {
-  AlogLockfreeQueue *queue;
+  AlogLockfreeMpmcQueue *queue;
   int count;
 } ProducerArgs;
 
 typedef struct {
-  AlogLockfreeQueue *queue;
+  AlogLockfreeMpmcQueue *queue;
   int count;
   bool fifo_ok;
 } ConsumerArgs;
 
 typedef struct {
-  AlogLockfreeQueue *queue;
+  AlogLockfreeMpmcQueue *queue;
   int start_value;
   int count;
 } MPMCProducerArgs;
 
 typedef struct {
-  AlogLockfreeQueue *queue;
+  AlogLockfreeMpmcQueue *queue;
   int total;
   bool *received;
   bool no_duplicates;
@@ -51,7 +51,7 @@ static void test_mpmc_integrity(void);
 static void *producer_fn(void *arg) {
   ProducerArgs *args = (ProducerArgs *)arg;
   for (int i = 0; i < args->count; i++) {
-    while (!alog_lockfree_queue_push(args->queue, &i))
+    while (!alog_lockfree_mpmc_queue_push(args->queue, &i))
       ;
   }
   return NULL;
@@ -62,7 +62,7 @@ static void *consumer_fn(void *arg) {
   bool ok = true;
   for (int i = 0; i < args->count; i++) {
     int val;
-    while (!alog_lockfree_queue_pop(args->queue, &val))
+    while (!alog_lockfree_mpmc_queue_pop(args->queue, &val))
       ;
     if (val != i)
       ok = false;
@@ -75,7 +75,7 @@ static void *mpmc_producer_fn(void *arg) {
   MPMCProducerArgs *args = (MPMCProducerArgs *)arg;
   for (int i = 0; i < args->count; i++) {
     int val = args->start_value + i;
-    while (!alog_lockfree_queue_push(args->queue, &val))
+    while (!alog_lockfree_mpmc_queue_push(args->queue, &val))
       ;
   }
   return NULL;
@@ -87,7 +87,7 @@ static void *mpmc_consumer_fn(void *arg) {
   bool no_corrupt = true;
   for (int i = 0; i < args->total; i++) {
     int val;
-    while (!alog_lockfree_queue_pop(args->queue, &val))
+    while (!alog_lockfree_mpmc_queue_pop(args->queue, &val))
       ;
     if (val < 0 || val >= args->total) {
       no_corrupt = false;
@@ -103,8 +103,8 @@ static void *mpmc_consumer_fn(void *arg) {
 }
 
 static void test_mpmc_integrity(void) {
-  AlogLockfreeQueue queue =
-      alog_lockfree_queue_create(MPMC_QUEUE_SIZE, sizeof(int));
+  AlogLockfreeMpmcQueue queue =
+      alog_lockfree_mpmc_queue_create(MPMC_QUEUE_SIZE, sizeof(int));
 
   bool *received = (bool *)calloc((size_t)MPMC_TOTAL_ITEMS, sizeof(bool));
   assert(received != NULL);
@@ -144,51 +144,51 @@ static void test_mpmc_integrity(void) {
   test_condition("MPMC: no corruption", cons_args.no_corruption);
 
   free(received);
-  alog_lockfree_queue_free(&queue);
+  alog_lockfree_mpmc_queue_free(&queue);
 }
 
-void test_lockfree_queue(void) {
+void test_lockfree_mpmc_queue(void) {
   const size_t capacity_for_tests = 3;
-  AlogLockfreeQueue queue =
-      alog_lockfree_queue_create(capacity_for_tests, sizeof(int));
+  AlogLockfreeMpmcQueue queue =
+      alog_lockfree_mpmc_queue_create(capacity_for_tests, sizeof(int));
 
   bool test_res = false;
   int test_data = 0;
 
   for (size_t i = 0; i < capacity_for_tests; i++) {
     int val = (int)i;
-    if (!(test_res = alog_lockfree_queue_push(&queue, &val)))
+    if (!(test_res = alog_lockfree_mpmc_queue_push(&queue, &val)))
       continue;
   }
   test_condition("Can push until full", test_res);
-  test_res = alog_lockfree_queue_push(&queue, &test_data);
+  test_res = alog_lockfree_mpmc_queue_push(&queue, &test_data);
   test_condition("Push on full returns false", test_res == false);
 
   for (size_t i = 0; i < capacity_for_tests; i++) {
     int data;
-    if (!(test_res = alog_lockfree_queue_pop(&queue, &data)))
+    if (!(test_res = alog_lockfree_mpmc_queue_pop(&queue, &data)))
       continue;
   }
   test_condition("Can pop until empty", test_res);
-  test_res = alog_lockfree_queue_pop(&queue, &test_data);
+  test_res = alog_lockfree_mpmc_queue_pop(&queue, &test_data);
   test_condition("Pop on empty returns false", test_res == false);
 
-  test_res = alog_lockfree_queue_push(&queue, &test_data);
-  test_res = alog_lockfree_queue_pop(&queue, &test_data);
+  test_res = alog_lockfree_mpmc_queue_push(&queue, &test_data);
+  test_res = alog_lockfree_mpmc_queue_pop(&queue, &test_data);
   test_condition("Can push and pop", test_res);
 
-  test_res = alog_lockfree_queue_pop(&queue, &test_data);
+  test_res = alog_lockfree_mpmc_queue_pop(&queue, &test_data);
   test_condition("Queue is empty after draining", test_res == false);
 
-  alog_lockfree_queue_free(&queue);
+  alog_lockfree_mpmc_queue_free(&queue);
   test_condition(
       "Free zeroes the structure",
       queue.data == NULL && queue.sequences == NULL && queue.capacity == 0 &&
           queue.elem_size == 0 && atomic_load(&queue.head) == 0 &&
           atomic_load(&queue.tail) == 0);
 
-  AlogLockfreeQueue concurrent_queue =
-      alog_lockfree_queue_create(8, sizeof(int));
+  AlogLockfreeMpmcQueue concurrent_queue =
+      alog_lockfree_mpmc_queue_create(8, sizeof(int));
 
   ProducerArgs prod_args = {.queue = &concurrent_queue,
                             .count = CONCURRENT_ITEM_COUNT};
@@ -205,7 +205,7 @@ void test_lockfree_queue(void) {
 
   test_condition("Concurrent SPSC preserves FIFO order", cons_args.fifo_ok);
 
-  alog_lockfree_queue_free(&concurrent_queue);
+  alog_lockfree_mpmc_queue_free(&concurrent_queue);
 
   test_mpmc_integrity();
 }

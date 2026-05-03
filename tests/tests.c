@@ -1,8 +1,8 @@
 #include "tests.h"
 #include "arklog/arklog.h"
-#include "locked_queue_tests.h"
-#include "lockfree_queue_tests.h"
+#include "lockfree_mpmc_queue_tests.h"
 #include "logger_tests.h"
+#include "mutex_locked_queue_tests.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -32,12 +32,12 @@ void end_test_section(const char *const section_name) {
 }
 
 int main(void) {
-  start_test_section("LOCKED QUEUE");
-  test_locked_queue();
-  end_test_section("LOCKED QUEUE");
-  start_test_section("LOCKFREE QUEUE");
-  test_lockfree_queue();
-  end_test_section("LOCKFREE QUEUE");
+  start_test_section("MUTEX LOCKED QUEUE");
+  test_mutex_locked_queue();
+  end_test_section("MUTEX LOCKED QUEUE");
+  start_test_section("LOCKFREE MPMC QUEUE");
+  test_lockfree_mpmc_queue();
+  end_test_section("LOCKFREE MPMC QUEUE");
   start_test_section("LOGGER");
   test_logger();
   end_test_section("LOGGER");

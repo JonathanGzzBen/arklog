@@ -1,8 +1,8 @@
 #ifndef ARKLOG_H
 #define ARKLOG_H
 
-#include "arklog/locked_queue.h"
-#include "arklog/lockfree_queue.h"
+#include "arklog/lockfree_mpmc_queue.h"
+#include "arklog/mutex_locked_queue.h"
 #include <pthread.h>
 #include <string.h>
 
@@ -35,8 +35,8 @@ typedef struct AlogLoggerConfiguration {
 typedef struct AlogLogger {
   AlogQueueType queue_type;
   union {
-    AlogLockedQueue locked;
-    AlogLockfreeQueue lockfree;
+    AlogMutexLockedQueue mutex_locked;
+    AlogLockfreeMpmcQueue lockfree_mpmc;
   } queue;
   char *memory; // Format: size_t + max_message_length + null char
   FILE *sink;

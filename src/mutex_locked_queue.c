@@ -1,7 +1,8 @@
-#include "arklog/locked_queue.h"
+#include "arklog/mutex_locked_queue.h"
 
-AlogLockedQueue alog_locked_queue_create(size_t elem_count, size_t elem_size) {
-  AlogLockedQueue queue = {
+AlogMutexLockedQueue alog_mutex_locked_queue_create(size_t elem_count,
+                                                    size_t elem_size) {
+  AlogMutexLockedQueue queue = {
       .data = (void *)malloc((elem_count + 1) * elem_size),
       .head = 0,
       .tail = 0,
@@ -11,7 +12,7 @@ AlogLockedQueue alog_locked_queue_create(size_t elem_count, size_t elem_size) {
   return queue;
 }
 
-bool alog_locked_queue_push(AlogLockedQueue *queue, void *data) {
+bool alog_mutex_locked_queue_push(AlogMutexLockedQueue *queue, void *data) {
   assert(queue != NULL);
   assert(data != NULL);
 
@@ -25,7 +26,7 @@ bool alog_locked_queue_push(AlogLockedQueue *queue, void *data) {
   return true;
 }
 
-bool alog_locked_queue_pop(AlogLockedQueue *queue, void *dest) {
+bool alog_mutex_locked_queue_pop(AlogMutexLockedQueue *queue, void *dest) {
   assert(queue != NULL);
   assert(dest != NULL);
   if (queue->head == queue->tail)
@@ -38,7 +39,7 @@ bool alog_locked_queue_pop(AlogLockedQueue *queue, void *dest) {
   return true;
 }
 
-void alog_locked_queue_free(AlogLockedQueue *queue) {
+void alog_mutex_locked_queue_free(AlogMutexLockedQueue *queue) {
   free(queue->data);
-  memset(queue, 0, sizeof(AlogLockedQueue));
+  memset(queue, 0, sizeof(AlogMutexLockedQueue));
 }
