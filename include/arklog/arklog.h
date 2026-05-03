@@ -7,6 +7,13 @@
 #include <pthread.h>
 #include <string.h>
 
+// Compile-time cap on the per-message buffer (includes log header and newline).
+// Effective max is min(AlogLoggerConfiguration.max_message_length, ALOG_MAX_MESSAGE_LENGTH).
+// Override at build time with -DARKLOG_MAX_MESSAGE_LENGTH=N passed to CMake.
+#ifndef ALOG_MAX_MESSAGE_LENGTH
+#define ALOG_MAX_MESSAGE_LENGTH 1024
+#endif
+
 // Take only filename from __FILE__
 #define __FILENAME__                                                           \
   (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
@@ -29,6 +36,9 @@ typedef enum LogLevel {
 typedef struct AlogLoggerConfiguration {
   AlogQueueType queue_type;
   size_t queue_size;
+  // Effective maximum is min(max_message_length, ALOG_MAX_MESSAGE_LENGTH).
+  // ALOG_MAX_MESSAGE_LENGTH is a compile-time cap (default 1024); override with
+  // -DARKLOG_MAX_MESSAGE_LENGTH=N at build time.
   size_t max_message_length;
   FILE *sink;
   LogLevel initial_log_level;
@@ -41,7 +51,6 @@ typedef struct AlogLogger {
     AlogLockfreeMpmcQueue lockfree_mpmc;
     AlogLockfreeMpscQueue lockfree_mpsc;
   } queue;
-  char *memory; // Format: size_t + max_message_length + null char
   FILE *sink;
   size_t max_message_length;
   pthread_t flushing_thread;

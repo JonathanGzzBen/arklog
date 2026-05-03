@@ -23,54 +23,57 @@ void alog_log(AlogLogger *logger, int level, const char *file, int line,
   // started
   // Pending: Timestamp, Thread ID, debug level in text
   assert(0 <= level && level < 6);
+
+  // Each calling thread gets its own buffer
+  _Thread_local static char tl_buf[sizeof(size_t) + ALOG_MAX_MESSAGE_LENGTH + 1];
+  const size_t msg_max = logger->max_message_length < ALOG_MAX_MESSAGE_LENGTH
+                             ? logger->max_message_length
+                             : ALOG_MAX_MESSAGE_LENGTH;
+
   const size_t log_header_length =
-      snprintf(logger->memory + sizeof(size_t), logger->max_message_length,
+      snprintf(tl_buf + sizeof(size_t), msg_max,
                "[LEVEL %5s] [%s:%d] [FUNC: %s] ", debug_types_str[level], file,
                line, func);
   va_list fmt_args;
   va_start(fmt_args, fmt);
-  size_t bytes_to_write = (log_header_length < logger->max_message_length)
+  size_t bytes_to_write = (log_header_length < msg_max)
                               ? log_header_length
-                              : logger->max_message_length;
+                              : msg_max;
 
   size_t log_message_length = 0;
-  if (bytes_to_write < logger->max_message_length) {
-    log_message_length = vsnprintf(
-        logger->memory + sizeof(size_t) + (log_header_length * sizeof(char)),
-        logger->max_message_length - log_header_length, fmt, fmt_args);
+  if (bytes_to_write < msg_max) {
+    log_message_length =
+        vsnprintf(tl_buf + sizeof(size_t) + log_header_length,
+                  msg_max - log_header_length, fmt, fmt_args);
     va_end(fmt_args);
 
     bytes_to_write += log_message_length;
-    bytes_to_write =
-        (bytes_to_write < logger->max_message_length)
-            ? bytes_to_write
-            : logger->max_message_length - 1; // Make space for line break
+    bytes_to_write = (bytes_to_write < msg_max)
+                         ? bytes_to_write
+                         : msg_max - 1; // Make space for line break
   }
 
-  // Write size of log into memory
-  logger->memory[sizeof(size_t) + (bytes_to_write * sizeof(char))] = '\n';
-  bytes_to_write++; // Line break
-  memcpy(logger->memory, &bytes_to_write, sizeof(size_t));
+  tl_buf[sizeof(size_t) + bytes_to_write] = '\n';
+  bytes_to_write++;
+  memcpy(tl_buf, &bytes_to_write, sizeof(size_t));
 
   assert(0 < bytes_to_write);
-  assert(bytes_to_write <= (logger->max_message_length));
-  assert(bytes_to_write <
-         sizeof(size_t) + logger->max_message_length + sizeof(char));
+  assert(bytes_to_write <= msg_max);
+  assert(bytes_to_write < sizeof(size_t) + msg_max + sizeof(char));
 
   if (logger->queue_type == ALOG_QUEUE_LOCKFREE_MPMC) {
-    alog_lockfree_mpmc_queue_push(&logger->queue.lockfree_mpmc, logger->memory);
+    alog_lockfree_mpmc_queue_push(&logger->queue.lockfree_mpmc, tl_buf);
   } else if (logger->queue_type == ALOG_QUEUE_LOCKFREE_MPSC) {
-    alog_lockfree_mpsc_queue_push(&logger->queue.lockfree_mpsc, logger->memory);
+    alog_lockfree_mpsc_queue_push(&logger->queue.lockfree_mpsc, tl_buf);
   } else {
     pthread_mutex_lock(&logger->queue_lock);
-    alog_mutex_locked_queue_push(&logger->queue.mutex_locked, logger->memory);
+    alog_mutex_locked_queue_push(&logger->queue.mutex_locked, tl_buf);
     pthread_mutex_unlock(&logger->queue_lock);
   }
 }
 
 AlogLogger alog_logger_create(AlogLoggerConfiguration configuration) {
   AlogLogger result = {.queue_type = ALOG_QUEUE_MUTEX_LOCKED,
-                       .memory = NULL,
                        .sink = NULL,
                        .max_message_length = 0,
                        .flushing_thread = 0,
@@ -89,14 +92,9 @@ AlogLogger alog_logger_create(AlogLoggerConfiguration configuration) {
     return result;
   }
 
-  const size_t log_size = sizeof(size_t) +
-                          (configuration.max_message_length * sizeof(char)) +
-                          sizeof(char); // Null char at end
-  result.memory = malloc(log_size);
-  assert(result.memory != NULL);
-  if (result.memory == NULL) {
-    return result;
-  }
+  // Queue slot size is fixed to the compile-time cap so it matches tl_buf in
+  // alog_log and pop_buf in the flush functions.
+  const size_t log_size = sizeof(size_t) + ALOG_MAX_MESSAGE_LENGTH + 1;
 
   assert(configuration.sink != NULL);
   result.sink = configuration.sink;
@@ -122,18 +120,19 @@ AlogLogger alog_logger_create(AlogLoggerConfiguration configuration) {
 
 static void *alog_logger_flush_continuous(void *logger) {
   AlogLogger *alog_logger = logger;
+  char pop_buf[sizeof(size_t) + ALOG_MAX_MESSAGE_LENGTH + 1];
   while (!alog_logger->stop_flag) {
     bool popped;
     if (alog_logger->queue_type == ALOG_QUEUE_LOCKFREE_MPMC) {
       popped = alog_lockfree_mpmc_queue_pop(&alog_logger->queue.lockfree_mpmc,
-                                            alog_logger->memory);
+                                            pop_buf);
     } else if (alog_logger->queue_type == ALOG_QUEUE_LOCKFREE_MPSC) {
       popped = alog_lockfree_mpsc_queue_pop(&alog_logger->queue.lockfree_mpsc,
-                                            alog_logger->memory);
+                                            pop_buf);
     } else {
       pthread_mutex_lock(&alog_logger->queue_lock);
       popped = alog_mutex_locked_queue_pop(&alog_logger->queue.mutex_locked,
-                                           alog_logger->memory);
+                                           pop_buf);
       pthread_mutex_unlock(&alog_logger->queue_lock);
     }
     if (!popped) {
@@ -145,9 +144,8 @@ static void *alog_logger_flush_continuous(void *logger) {
       continue;
     }
     size_t message_size = 0;
-    memcpy(&message_size, alog_logger->memory, sizeof(size_t));
-    fwrite(alog_logger->memory + sizeof(size_t), message_size, 1,
-           alog_logger->sink);
+    memcpy(&message_size, pop_buf, sizeof(size_t));
+    fwrite(pop_buf + sizeof(size_t), message_size, 1, alog_logger->sink);
   }
   alog_logger_flush(logger);
   return NULL;
@@ -160,28 +158,28 @@ void alog_logger_start_flushing_thread(AlogLogger *logger) {
 }
 
 void alog_logger_flush(AlogLogger *logger) {
+  char pop_buf[sizeof(size_t) + ALOG_MAX_MESSAGE_LENGTH + 1];
   if (logger->queue_type == ALOG_QUEUE_LOCKFREE_MPMC) {
     while (alog_lockfree_mpmc_queue_pop(&logger->queue.lockfree_mpmc,
-                                        logger->memory)) {
+                                        pop_buf)) {
       size_t message_size = 0;
-      memcpy(&message_size, logger->memory, sizeof(size_t));
-      fwrite(logger->memory + sizeof(size_t), message_size, 1, logger->sink);
+      memcpy(&message_size, pop_buf, sizeof(size_t));
+      fwrite(pop_buf + sizeof(size_t), message_size, 1, logger->sink);
     }
   } else if (logger->queue_type == ALOG_QUEUE_LOCKFREE_MPSC) {
     while (alog_lockfree_mpsc_queue_pop(&logger->queue.lockfree_mpsc,
-                                        logger->memory)) {
+                                        pop_buf)) {
       size_t message_size = 0;
-      memcpy(&message_size, logger->memory, sizeof(size_t));
-      fwrite(logger->memory + sizeof(size_t), message_size, 1, logger->sink);
+      memcpy(&message_size, pop_buf, sizeof(size_t));
+      fwrite(pop_buf + sizeof(size_t), message_size, 1, logger->sink);
     }
   } else {
     pthread_mutex_lock(&logger->queue_lock);
-    while (alog_mutex_locked_queue_pop(&logger->queue.mutex_locked,
-                                       logger->memory)) {
+    while (alog_mutex_locked_queue_pop(&logger->queue.mutex_locked, pop_buf)) {
       pthread_mutex_unlock(&logger->queue_lock);
       size_t message_size = 0;
-      memcpy(&message_size, logger->memory, sizeof(size_t));
-      fwrite(logger->memory + sizeof(size_t), message_size, 1, logger->sink);
+      memcpy(&message_size, pop_buf, sizeof(size_t));
+      fwrite(pop_buf + sizeof(size_t), message_size, 1, logger->sink);
       pthread_mutex_lock(&logger->queue_lock);
     }
     pthread_mutex_unlock(&logger->queue_lock);
@@ -206,6 +204,5 @@ void alog_logger_free(AlogLogger *logger) {
   } else {
     alog_mutex_locked_queue_free(&logger->queue.mutex_locked);
   }
-  free(logger->memory);
   logger->valid = false;
 }

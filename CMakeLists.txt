@@ -78,6 +78,13 @@ add_library(arklog_lib
                 src/lockfree_mpmc_queue.c
                 src/lockfree_mpsc_queue.c)
 target_include_directories(arklog_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+# ALOG_MAX_MESSAGE_LENGTH is a compile-time cap on the per-message buffer (default 1024 bytes).
+# This hard cap applies even if AlogLoggerConfiguration.max_message_length is set higher.
+# Override at configure time: cmake -B build -DARKLOG_MAX_MESSAGE_LENGTH=N
+if(DEFINED ARKLOG_MAX_MESSAGE_LENGTH)
+    target_compile_definitions(arklog_lib PUBLIC
+        ALOG_MAX_MESSAGE_LENGTH=${ARKLOG_MAX_MESSAGE_LENGTH})
+endif()
 
 # apply custom compiler flags
 foreach(compiler_flag ${custom_compiler_flags})

@@ -89,6 +89,7 @@ Available log levels (from lowest to highest verbosity): `LOG_LEVEL_FATAL`, `LOG
 
 - When the queue is full, incoming messages are dropped. This is a design choice to prioritize non-blocking behavior.
 - `max_message_length` includes the log header, so the usable message body is shorter.
+- `ALOG_MAX_MESSAGE_LENGTH` is a compile-time cap on the per-message buffer size (default: 1024 bytes, includes log header and newline). Setting `max_message_length` in the configuration above this value will silently truncate to the cap. To raise it, pass `-DARKLOG_MAX_MESSAGE_LENGTH=N` to CMake at configure time.
 
 ## Future Improvements
 
