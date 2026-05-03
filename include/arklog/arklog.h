@@ -2,6 +2,7 @@
 #define ARKLOG_H
 
 #include "arklog/lockfree_mpmc_queue.h"
+#include "arklog/lockfree_mpsc_queue.h"
 #include "arklog/mutex_locked_queue.h"
 #include <pthread.h>
 #include <string.h>
@@ -12,7 +13,8 @@
 
 typedef enum AlogQueueType {
   ALOG_QUEUE_MUTEX_LOCKED,
-  ALOG_QUEUE_LOCKFREE_MPMC
+  ALOG_QUEUE_LOCKFREE_MPMC,
+  ALOG_QUEUE_LOCKFREE_MPSC
 } AlogQueueType;
 
 typedef enum LogLevel {
@@ -37,6 +39,7 @@ typedef struct AlogLogger {
   union {
     AlogMutexLockedQueue mutex_locked;
     AlogLockfreeMpmcQueue lockfree_mpmc;
+    AlogLockfreeMpscQueue lockfree_mpsc;
   } queue;
   char *memory; // Format: size_t + max_message_length + null char
   FILE *sink;

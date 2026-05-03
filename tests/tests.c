@@ -1,6 +1,7 @@
 #include "tests.h"
 #include "arklog/arklog.h"
 #include "lockfree_mpmc_queue_tests.h"
+#include "lockfree_mpsc_queue_tests.h"
 #include "logger_tests.h"
 #include "mutex_locked_queue_tests.h"
 
@@ -38,6 +39,9 @@ int main(void) {
   start_test_section("LOCKFREE MPMC QUEUE");
   test_lockfree_mpmc_queue();
   end_test_section("LOCKFREE MPMC QUEUE");
+  start_test_section("LOCKFREE MPSC QUEUE");
+  test_lockfree_mpsc_queue();
+  end_test_section("LOCKFREE MPSC QUEUE");
   start_test_section("LOGGER");
   test_logger();
   end_test_section("LOGGER");
