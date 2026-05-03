@@ -1,6 +1,7 @@
 #ifndef ARKLOG_H
 #define ARKLOG_H
 
+#include "arklog/atomic_ring_buffer.h"
 #include "arklog/ring_buffer.h"
 #include <pthread.h>
 #include <string.h>
@@ -8,6 +9,11 @@
 // Take only filename from __FILE__
 #define __FILENAME__                                                           \
   (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+
+typedef enum AlogQueueType {
+  ALOG_QUEUE_MUTEX_LOCKED,
+  ALOG_QUEUE_LOCKFREE_MPMC
+} AlogQueueType;
 
 typedef enum LogLevel {
   LOG_LEVEL_FATAL,
@@ -19,6 +25,7 @@ typedef enum LogLevel {
 } LogLevel;
 
 typedef struct AlogLoggerConfiguration {
+  AlogQueueType queue_type;
   size_t queue_size;
   size_t max_message_length;
   FILE *sink;
@@ -26,13 +33,17 @@ typedef struct AlogLoggerConfiguration {
 } AlogLoggerConfiguration;
 
 typedef struct AlogLogger {
-  AlogRingBuffer ring_buffer;
-  char *memory; // Fomat: size_t + max_message_length + null char
+  AlogQueueType queue_type;
+  union {
+    AlogRingBuffer locked;
+    AlogAtomicRingBuffer lockfree;
+  } queue;
+  char *memory; // Format: size_t + max_message_length + null char
   FILE *sink;
   size_t max_message_length;
   pthread_t flushing_thread;
   bool stop_flag;
-  pthread_mutex_t queue_lock;
+  pthread_mutex_t queue_lock; // only used with ALOG_QUEUE_MUTEX_LOCKED
   LogLevel current_log_level;
   bool valid;
 } AlogLogger;
