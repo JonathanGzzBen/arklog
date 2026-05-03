@@ -1,6 +1,5 @@
 #include "logger_tests.h"
 #include "arklog/arklog.h"
-#include "arklog/ring_buffer.h"
 #include "tests.h"
 #include <pthread.h>
 #include <stdio.h>
@@ -65,9 +64,9 @@ void test_logger(void) {
   test_condition("Can start flushing thread", true);
   while (true) {
     pthread_mutex_lock(&logger.queue_lock);
-    bool is_empty = alog_ring_buffer_is_empty(logger.ring_buffer);
+    bool empty = logger.ring_buffer.head == logger.ring_buffer.tail;
     pthread_mutex_unlock(&logger.queue_lock);
-    if (is_empty)
+    if (empty)
       break;
     struct timespec ts;
     ts.tv_sec = 0;

@@ -135,14 +135,15 @@ void alog_logger_start_flushing_thread(AlogLogger *logger) {
 }
 
 void alog_logger_flush(AlogLogger *logger) {
-  while (!alog_ring_buffer_is_empty(logger->ring_buffer)) {
-    pthread_mutex_lock(&logger->queue_lock);
-    assert(alog_ring_buffer_pop(&logger->ring_buffer, logger->memory));
+  pthread_mutex_lock(&logger->queue_lock);
+  while (alog_ring_buffer_pop(&logger->ring_buffer, logger->memory)) {
     pthread_mutex_unlock(&logger->queue_lock);
     size_t message_size = 0;
     memcpy(&message_size, logger->memory, sizeof(size_t));
     fwrite(logger->memory + sizeof(size_t), message_size, 1, logger->sink);
+    pthread_mutex_lock(&logger->queue_lock);
   }
+  pthread_mutex_unlock(&logger->queue_lock);
   fflush(logger->sink);
 }
 
