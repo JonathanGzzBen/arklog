@@ -1,6 +1,6 @@
 #include "arklog/arklog.h"
-#include "arklog/atomic_ring_buffer.h"
-#include "arklog/ring_buffer.h"
+#include "arklog/locked_queue.h"
+#include "arklog/lockfree_queue.h"
 #include <assert.h>
 #include <pthread.h>
 #include <stdarg.h>
@@ -57,10 +57,10 @@ void alog_log(AlogLogger *logger, int level, const char *file, int line,
          sizeof(size_t) + logger->max_message_length + sizeof(char));
 
   if (logger->queue_type == ALOG_QUEUE_LOCKFREE_MPMC) {
-    alog_atomic_ring_buffer_push(&logger->queue.lockfree, logger->memory);
+    alog_lockfree_queue_push(&logger->queue.lockfree, logger->memory);
   } else {
     pthread_mutex_lock(&logger->queue_lock);
-    alog_ring_buffer_push(&logger->queue.locked, logger->memory);
+    alog_locked_queue_push(&logger->queue.locked, logger->memory);
     pthread_mutex_unlock(&logger->queue_lock);
   }
 }
@@ -104,10 +104,10 @@ AlogLogger alog_logger_create(AlogLoggerConfiguration configuration) {
 
   if (configuration.queue_type == ALOG_QUEUE_LOCKFREE_MPMC) {
     result.queue.lockfree =
-        alog_atomic_ring_buffer_create(configuration.queue_size, log_size);
+        alog_lockfree_queue_create(configuration.queue_size, log_size);
   } else {
     result.queue.locked =
-        alog_ring_buffer_create(configuration.queue_size, log_size);
+        alog_locked_queue_create(configuration.queue_size, log_size);
   }
 
   result.valid = true;
@@ -119,13 +119,12 @@ static void *alog_logger_flush_continuous(void *logger) {
   while (!alog_logger->stop_flag) {
     bool popped;
     if (alog_logger->queue_type == ALOG_QUEUE_LOCKFREE_MPMC) {
-      popped =
-          alog_atomic_ring_buffer_pop(&alog_logger->queue.lockfree,
-                                      alog_logger->memory);
+      popped = alog_lockfree_queue_pop(&alog_logger->queue.lockfree,
+                                       alog_logger->memory);
     } else {
       pthread_mutex_lock(&alog_logger->queue_lock);
-      popped = alog_ring_buffer_pop(&alog_logger->queue.locked,
-                                    alog_logger->memory);
+      popped = alog_locked_queue_pop(&alog_logger->queue.locked,
+                                     alog_logger->memory);
       pthread_mutex_unlock(&alog_logger->queue_lock);
     }
     if (!popped) {
@@ -153,15 +152,14 @@ void alog_logger_start_flushing_thread(AlogLogger *logger) {
 
 void alog_logger_flush(AlogLogger *logger) {
   if (logger->queue_type == ALOG_QUEUE_LOCKFREE_MPMC) {
-    while (alog_atomic_ring_buffer_pop(&logger->queue.lockfree,
-                                       logger->memory)) {
+    while (alog_lockfree_queue_pop(&logger->queue.lockfree, logger->memory)) {
       size_t message_size = 0;
       memcpy(&message_size, logger->memory, sizeof(size_t));
       fwrite(logger->memory + sizeof(size_t), message_size, 1, logger->sink);
     }
   } else {
     pthread_mutex_lock(&logger->queue_lock);
-    while (alog_ring_buffer_pop(&logger->queue.locked, logger->memory)) {
+    while (alog_locked_queue_pop(&logger->queue.locked, logger->memory)) {
       pthread_mutex_unlock(&logger->queue_lock);
       size_t message_size = 0;
       memcpy(&message_size, logger->memory, sizeof(size_t));
@@ -184,9 +182,9 @@ void alog_logger_free(AlogLogger *logger) {
     pthread_join(logger->flushing_thread, NULL);
   }
   if (logger->queue_type == ALOG_QUEUE_LOCKFREE_MPMC) {
-    alog_atomic_ring_buffer_free(&logger->queue.lockfree);
+    alog_lockfree_queue_free(&logger->queue.lockfree);
   } else {
-    alog_ring_buffer_free(&logger->queue.locked);
+    alog_locked_queue_free(&logger->queue.locked);
   }
   free(logger->memory);
   logger->valid = false;

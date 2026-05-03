@@ -1,8 +1,8 @@
 #ifndef ARKLOG_H
 #define ARKLOG_H
 
-#include "arklog/atomic_ring_buffer.h"
-#include "arklog/ring_buffer.h"
+#include "arklog/locked_queue.h"
+#include "arklog/lockfree_queue.h"
 #include <pthread.h>
 #include <string.h>
 
@@ -35,8 +35,8 @@ typedef struct AlogLoggerConfiguration {
 typedef struct AlogLogger {
   AlogQueueType queue_type;
   union {
-    AlogRingBuffer locked;
-    AlogAtomicRingBuffer lockfree;
+    AlogLockedQueue locked;
+    AlogLockfreeQueue lockfree;
   } queue;
   char *memory; // Format: size_t + max_message_length + null char
   FILE *sink;

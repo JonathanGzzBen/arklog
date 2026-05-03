@@ -1,4 +1,4 @@
-#include "atomic_ring_buffer_tests.h"
+#include "lockfree_queue_tests.h"
 #include "tests.h"
 
 #include <assert.h>
@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <arklog/atomic_ring_buffer.h>
+#include <arklog/lockfree_queue.h>
 
 #define CONCURRENT_ITEM_COUNT 10000
 
@@ -18,24 +18,24 @@
 #define MPMC_QUEUE_SIZE         64
 
 typedef struct {
-  AlogAtomicRingBuffer *ring;
+  AlogLockfreeQueue *queue;
   int count;
 } ProducerArgs;
 
 typedef struct {
-  AlogAtomicRingBuffer *ring;
+  AlogLockfreeQueue *queue;
   int count;
   bool fifo_ok;
 } ConsumerArgs;
 
 typedef struct {
-  AlogAtomicRingBuffer *ring;
+  AlogLockfreeQueue *queue;
   int start_value;
   int count;
 } MPMCProducerArgs;
 
 typedef struct {
-  AlogAtomicRingBuffer *ring;
+  AlogLockfreeQueue *queue;
   int total;
   bool *received;
   bool no_duplicates;
@@ -51,7 +51,7 @@ static void test_mpmc_integrity(void);
 static void *producer_fn(void *arg) {
   ProducerArgs *args = (ProducerArgs *)arg;
   for (int i = 0; i < args->count; i++) {
-    while (!alog_atomic_ring_buffer_push(args->ring, &i))
+    while (!alog_lockfree_queue_push(args->queue, &i))
       ;
   }
   return NULL;
@@ -62,7 +62,7 @@ static void *consumer_fn(void *arg) {
   bool ok = true;
   for (int i = 0; i < args->count; i++) {
     int val;
-    while (!alog_atomic_ring_buffer_pop(args->ring, &val))
+    while (!alog_lockfree_queue_pop(args->queue, &val))
       ;
     if (val != i)
       ok = false;
@@ -75,7 +75,7 @@ static void *mpmc_producer_fn(void *arg) {
   MPMCProducerArgs *args = (MPMCProducerArgs *)arg;
   for (int i = 0; i < args->count; i++) {
     int val = args->start_value + i;
-    while (!alog_atomic_ring_buffer_push(args->ring, &val))
+    while (!alog_lockfree_queue_push(args->queue, &val))
       ;
   }
   return NULL;
@@ -87,7 +87,7 @@ static void *mpmc_consumer_fn(void *arg) {
   bool no_corrupt = true;
   for (int i = 0; i < args->total; i++) {
     int val;
-    while (!alog_atomic_ring_buffer_pop(args->ring, &val))
+    while (!alog_lockfree_queue_pop(args->queue, &val))
       ;
     if (val < 0 || val >= args->total) {
       no_corrupt = false;
@@ -103,8 +103,8 @@ static void *mpmc_consumer_fn(void *arg) {
 }
 
 static void test_mpmc_integrity(void) {
-  AlogAtomicRingBuffer ring =
-      alog_atomic_ring_buffer_create(MPMC_QUEUE_SIZE, sizeof(int));
+  AlogLockfreeQueue queue =
+      alog_lockfree_queue_create(MPMC_QUEUE_SIZE, sizeof(int));
 
   bool *received = (bool *)calloc((size_t)MPMC_TOTAL_ITEMS, sizeof(bool));
   assert(received != NULL);
@@ -112,7 +112,7 @@ static void test_mpmc_integrity(void) {
   MPMCProducerArgs prod_args[MPMC_PRODUCERS];
   pthread_t prod_tids[MPMC_PRODUCERS];
 
-  MPMCConsumerArgs cons_args = {.ring = &ring,
+  MPMCConsumerArgs cons_args = {.queue = &queue,
                                 .total = MPMC_TOTAL_ITEMS,
                                 .received = received,
                                 .no_duplicates = true,
@@ -120,7 +120,7 @@ static void test_mpmc_integrity(void) {
   pthread_t cons_tid;
 
   for (int i = 0; i < MPMC_PRODUCERS; i++) {
-    prod_args[i].ring = &ring;
+    prod_args[i].queue = &queue;
     prod_args[i].start_value = i * MPMC_ITEMS_PER_PRODUCER;
     prod_args[i].count = MPMC_ITEMS_PER_PRODUCER;
     pthread_create(&prod_tids[i], NULL, mpmc_producer_fn, &prod_args[i]);
@@ -144,56 +144,57 @@ static void test_mpmc_integrity(void) {
   test_condition("MPMC: no corruption", cons_args.no_corruption);
 
   free(received);
-  alog_atomic_ring_buffer_free(&ring);
+  alog_lockfree_queue_free(&queue);
 }
 
-void test_atomic_ring_buffer(void) {
+void test_lockfree_queue(void) {
   const size_t capacity_for_tests = 3;
-  AlogAtomicRingBuffer ring =
-      alog_atomic_ring_buffer_create(capacity_for_tests, sizeof(int));
+  AlogLockfreeQueue queue =
+      alog_lockfree_queue_create(capacity_for_tests, sizeof(int));
 
   bool test_res = false;
   int test_data = 0;
 
   for (size_t i = 0; i < capacity_for_tests; i++) {
     int val = (int)i;
-    if (!(test_res = alog_atomic_ring_buffer_push(&ring, &val)))
+    if (!(test_res = alog_lockfree_queue_push(&queue, &val)))
       continue;
   }
   test_condition("Can push until full", test_res);
-  test_res = alog_atomic_ring_buffer_push(&ring, &test_data);
+  test_res = alog_lockfree_queue_push(&queue, &test_data);
   test_condition("Push on full returns false", test_res == false);
 
   for (size_t i = 0; i < capacity_for_tests; i++) {
     int data;
-    if (!(test_res = alog_atomic_ring_buffer_pop(&ring, &data)))
+    if (!(test_res = alog_lockfree_queue_pop(&queue, &data)))
       continue;
   }
   test_condition("Can pop until empty", test_res);
-  test_res = alog_atomic_ring_buffer_pop(&ring, &test_data);
+  test_res = alog_lockfree_queue_pop(&queue, &test_data);
   test_condition("Pop on empty returns false", test_res == false);
 
-  test_res = alog_atomic_ring_buffer_push(&ring, &test_data);
-  test_res = alog_atomic_ring_buffer_pop(&ring, &test_data);
+  test_res = alog_lockfree_queue_push(&queue, &test_data);
+  test_res = alog_lockfree_queue_pop(&queue, &test_data);
   test_condition("Can push and pop", test_res);
 
-  test_res = alog_atomic_ring_buffer_pop(&ring, &test_data);
+  test_res = alog_lockfree_queue_pop(&queue, &test_data);
   test_condition("Queue is empty after draining", test_res == false);
 
-  alog_atomic_ring_buffer_free(&ring);
+  alog_lockfree_queue_free(&queue);
   test_condition(
       "Free zeroes the structure",
-      ring.data == NULL && ring.sequences == NULL && ring.capacity == 0 &&
-          ring.elem_size == 0 && atomic_load(&ring.head) == 0 &&
-          atomic_load(&ring.tail) == 0);
+      queue.data == NULL && queue.sequences == NULL && queue.capacity == 0 &&
+          queue.elem_size == 0 && atomic_load(&queue.head) == 0 &&
+          atomic_load(&queue.tail) == 0);
 
-  AlogAtomicRingBuffer concurrent_ring =
-      alog_atomic_ring_buffer_create(8, sizeof(int));
+  AlogLockfreeQueue concurrent_queue =
+      alog_lockfree_queue_create(8, sizeof(int));
 
-  ProducerArgs prod_args = {.ring = &concurrent_ring,
+  ProducerArgs prod_args = {.queue = &concurrent_queue,
                             .count = CONCURRENT_ITEM_COUNT};
-  ConsumerArgs cons_args = {
-      .ring = &concurrent_ring, .count = CONCURRENT_ITEM_COUNT, .fifo_ok = false};
+  ConsumerArgs cons_args = {.queue = &concurrent_queue,
+                            .count = CONCURRENT_ITEM_COUNT,
+                            .fifo_ok = false};
 
   pthread_t prod_tid;
   pthread_t cons_tid;
@@ -204,7 +205,7 @@ void test_atomic_ring_buffer(void) {
 
   test_condition("Concurrent SPSC preserves FIFO order", cons_args.fifo_ok);
 
-  alog_atomic_ring_buffer_free(&concurrent_ring);
+  alog_lockfree_queue_free(&concurrent_queue);
 
   test_mpmc_integrity();
 }

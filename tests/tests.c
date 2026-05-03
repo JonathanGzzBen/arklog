@@ -1,8 +1,8 @@
 #include "tests.h"
 #include "arklog/arklog.h"
-#include "atomic_ring_buffer_tests.h"
+#include "locked_queue_tests.h"
+#include "lockfree_queue_tests.h"
 #include "logger_tests.h"
-#include "ring_buffer_tests.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -32,12 +32,12 @@ void end_test_section(const char *const section_name) {
 }
 
 int main(void) {
-  start_test_section("RING BUFFER");
-  test_ring_buffer();
-  end_test_section("RING BUFFER");
-  start_test_section("ATOMIC RING BUFFER");
-  test_atomic_ring_buffer();
-  end_test_section("ATOMIC RING BUFFER");
+  start_test_section("LOCKED QUEUE");
+  test_locked_queue();
+  end_test_section("LOCKED QUEUE");
+  start_test_section("LOCKFREE QUEUE");
+  test_lockfree_queue();
+  end_test_section("LOCKFREE QUEUE");
   start_test_section("LOGGER");
   test_logger();
   end_test_section("LOGGER");
